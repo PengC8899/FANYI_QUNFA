@@ -93,6 +93,25 @@ class Storage:
                 )
                 """
             )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS broadcast_tags (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    name TEXT UNIQUE,
+                    created_at TEXT
+                )
+                """
+            )
+            cur.execute(
+                """
+                CREATE TABLE IF NOT EXISTS broadcast_tag_members (
+                    tag_id INTEGER,
+                    chat_id INTEGER,
+                    PRIMARY KEY (tag_id, chat_id),
+                    FOREIGN KEY (tag_id) REFERENCES broadcast_tags(id) ON DELETE CASCADE
+                )
+                """
+            )
             conn.commit()
             conn.close()
 
@@ -308,3 +327,61 @@ class Storage:
             )
             conn.commit()
             conn.close()
+
+    def create_tag(self, name: str) -> int:
+        with self._lock:
+            conn = self._connect()
+            cur = conn.cursor()
+            try:
+                cur.execute("INSERT INTO broadcast_tags(name, created_at) VALUES(?,?)", (name, datetime.utcnow().isoformat()))
+                tag_id = cur.lastrowid
+                conn.commit()
+                return tag_id
+            except sqlite3.IntegrityError:
+                # Name already exists, return existing id
+                cur.execute("SELECT id FROM broadcast_tags WHERE name=?", (name,))
+                row = cur.fetchone()
+                return row[0] if row else -1
+            finally:
+                conn.close()
+
+    def delete_tag(self, tag_id: int):
+        with self._lock:
+            conn = self._connect()
+            cur = conn.cursor()
+            cur.execute("DELETE FROM broadcast_tags WHERE id=?", (tag_id,))
+            conn.commit()
+            conn.close()
+
+    def get_all_tags(self) -> List[Tuple[int, str, int]]:
+        with self._lock:
+            conn = self._connect()
+            cur = conn.cursor()
+            # Return id, name, member_count
+            cur.execute("""
+                SELECT t.id, t.name, COUNT(m.chat_id) 
+                FROM broadcast_tags t 
+                LEFT JOIN broadcast_tag_members m ON t.id = m.tag_id 
+                GROUP BY t.id
+            """)
+            rows = cur.fetchall()
+            conn.close()
+            return [(int(r[0]), str(r[1]), int(r[2])) for r in rows]
+
+    def add_members_to_tag(self, tag_id: int, chat_ids: List[int]):
+        with self._lock:
+            conn = self._connect()
+            cur = conn.cursor()
+            data = [(tag_id, cid) for cid in chat_ids]
+            cur.executemany("INSERT OR IGNORE INTO broadcast_tag_members(tag_id, chat_id) VALUES(?,?)", data)
+            conn.commit()
+            conn.close()
+
+    def get_tag_members(self, tag_id: int) -> List[int]:
+        with self._lock:
+            conn = self._connect()
+            cur = conn.cursor()
+            cur.execute("SELECT chat_id FROM broadcast_tag_members WHERE tag_id=?", (tag_id,))
+            rows = cur.fetchall()
+            conn.close()
+            return [int(r[0]) for r in rows]
