@@ -326,10 +326,19 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             
         try:
             fb = FallbackTranslator()
-            translated = await fb.translate(text, source_lang=src, target_lang=target)
+            translated = await fb.translate(translate_text, source_lang=src, target_lang=target)
             translated = sanitize_text(translated)
-            if translated:
-                await msg.reply_text(translated)
+            if not translated:
+                return
+            if target == "zh":
+                if sum(1 for c in translated if '\u4e00' <= c <= '\u9fff') == 0:
+                    logger.warning("Fallback result has no Chinese characters, skipping group reply.")
+                    return
+            if target == "en":
+                if not any(("a" <= c <= "z") or ("A" <= c <= "Z") for c in translated):
+                    logger.warning("Fallback result has no Latin letters, skipping group reply.")
+                    return
+            await msg.reply_text(translated)
         finally:
             storage.record_trans_log(chat.id, msg.message_id, user.id, src, target, False)
 

@@ -152,8 +152,8 @@ class Storage:
 
     def get_all_active_groups(self) -> List[Tuple[int, str, str]]:
         with self._lock:
-            if self._groups_cache is None:
-                self._load_groups_cache()
+            # Always reload to ensure fresh data from DB (cross-process sync)
+            self._load_groups_cache()
             return list(self._groups_cache)
 
     def is_group_active(self, chat_id: int) -> bool:

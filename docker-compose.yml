@@ -13,3 +13,16 @@ services:
       options:
         max-size: "10m"
         max-file: "3"
+
+  tg-dashboard:
+    build: .
+    container_name: tg-dashboard
+    restart: always
+    env_file:
+      - .env
+    volumes:
+      - ./data:/app/data
+      - ./logs:/app/logs
+    ports:
+      - "8000:8000"
+    command: ["uvicorn", "webapp:app", "--host", "0.0.0.0", "--port", "8000"]
