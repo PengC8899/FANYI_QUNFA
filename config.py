@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     LLM_API_ENDPOINT: Optional[str] = Field(default=None)
     LLM_MODEL: str = Field(default="gpt-4o-mini")
 
+    # Dashboard Auth
+    DASHBOARD_USERNAME: str = Field(default="admin")
+    DASHBOARD_PASSWORD: str = Field(default="9999")
+
     class Config:
         env_file = ".env"
         env_file_encoding = "utf-8"

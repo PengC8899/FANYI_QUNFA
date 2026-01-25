@@ -1,7 +1,8 @@
+import uuid
 from typing import List
 
-from fastapi import FastAPI, HTTPException
-from fastapi.responses import HTMLResponse
+from fastapi import FastAPI, HTTPException, Request, Response, Form, Depends
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from telegram import Bot
 
@@ -14,6 +15,100 @@ bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
 
 app = FastAPI(title="TG Bot Dashboard")
 
+# Simple in-memory session store
+SESSIONS = set()
+
+@app.middleware("http")
+async def auth_middleware(request: Request, call_next):
+    # Skip auth for login page and static assets if any (none here)
+    if request.url.path in ["/login", "/docs", "/openapi.json"]:
+        return await call_next(request)
+    
+    # Check auth for API and Root
+    if request.url.path.startswith("/api/") or request.url.path == "/":
+        session_id = request.cookies.get("session_id")
+        if not session_id or session_id not in SESSIONS:
+            if request.url.path.startswith("/api/"):
+                return Response(content="Unauthorized", status_code=401)
+            else:
+                return RedirectResponse(url="/login")
+    
+    response = await call_next(request)
+    return response
+
+@app.get("/login", response_class=HTMLResponse)
+async def login_page():
+    html = """
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>登录 - Telegram Bot 管理后台</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+        <style>
+            body { background-color: #f8f9fa; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+            .login-card { width: 100%; max-width: 400px; padding: 2rem; border-radius: 10px; box-shadow: 0 4px 6px rgba(0,0,0,0.1); background: #fff; }
+            .btn-primary { width: 100%; }
+        </style>
+    </head>
+    <body>
+        <div class="login-card">
+            <h4 class="text-center mb-4">Telegram Bot 管理后台</h4>
+            <form action="/login" method="post">
+                <div class="mb-3">
+                    <label class="form-label">账号</label>
+                    <input type="text" name="username" class="form-control" required autofocus>
+                </div>
+                <div class="mb-3">
+                    <label class="form-label">密码</label>
+                    <input type="password" name="password" class="form-control" required>
+                </div>
+                <button type="submit" class="btn btn-primary py-2">登 录</button>
+            </form>
+        </div>
+    </body>
+    </html>
+    """
+    return html
+
+@app.post("/login")
+async def login(username: str = Form(...), password: str = Form(...)):
+    if username == settings.DASHBOARD_USERNAME and password == settings.DASHBOARD_PASSWORD:
+        session_id = str(uuid.uuid4())
+        SESSIONS.add(session_id)
+        response = RedirectResponse(url="/", status_code=303)
+        response.set_cookie(key="session_id", value=session_id, httponly=True, max_age=86400)
+        return response
+    
+    # Return login page with error
+    html = """
+    <!DOCTYPE html>
+    <html lang="zh-CN">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1">
+        <title>登录失败</title>
+        <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0/dist/css/bootstrap.min.css" rel="stylesheet">
+    </head>
+    <body class="d-flex align-items-center justify-content-center vh-100 bg-light">
+        <div class="text-center">
+            <div class="alert alert-danger">账号或密码错误</div>
+            <a href="/login" class="btn btn-secondary">返回重试</a>
+        </div>
+    </body>
+    </html>
+    """
+    return HTMLResponse(content=html, status_code=401)
+
+@app.get("/logout")
+async def logout(request: Request):
+    session_id = request.cookies.get("session_id")
+    if session_id and session_id in SESSIONS:
+        SESSIONS.remove(session_id)
+    response = RedirectResponse(url="/login", status_code=303)
+    response.delete_cookie("session_id")
+    return response
 
 class Group(BaseModel):
     chat_id: int
@@ -155,6 +250,7 @@ async def dashboard_page():
       <nav class="navbar navbar-expand-lg navbar-dark bg-primary mb-4 shadow-sm">
         <div class="container">
           <a class="navbar-brand" href="#"><i class="bi bi-robot me-2"></i>Telegram Bot 管理后台</a>
+          <a href="/logout" class="btn btn-outline-light btn-sm"><i class="bi bi-box-arrow-right me-1"></i>退出登录</a>
         </div>
       </nav>
 
