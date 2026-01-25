@@ -66,6 +66,7 @@ def main():
     app.add_handler(MessageHandler(filters.Regex(r"^/开始(?:\s|$)"), cn_start))
     app.add_handler(CommandHandler("stop", cmd_stop))
     app.add_handler(MessageHandler(filters.Regex(r"^/停止(?:\s|$)"), cn_stop))
+    app.add_handler(MessageHandler(filters.Regex(r"^/停止翻译(?:\s|$)"), cn_stop))
     # Add English aliases for pause/resume logic
     app.add_handler(CommandHandler("pause", cmd_pause))
     app.add_handler(CommandHandler("resume", cmd_start))
