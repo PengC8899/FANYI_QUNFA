@@ -27,6 +27,21 @@ async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
         return
     chat = update.effective_chat
     user = update.effective_user
+    
+    # Permission check for /start in groups
+    # Allow: Owner, Controllers, Group Admins
+    is_authorized = False
+    if _is_admin(user.id):
+        is_authorized = True
+    else:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status in ("administrator", "creator"):
+            is_authorized = True
+            
+    if not is_authorized:
+        # Silently ignore or maybe reply? Usually silently ignore to avoid spam
+        return
+
     # /start command in group: Enable translation
     storage.add_group(chat.id, chat.title or str(chat.id), user.id, datetime.utcnow())
     storage.set_translation_enabled(chat.id, True)
@@ -38,8 +53,16 @@ async def cmd_stop(update: Update, context: ContextTypes.DEFAULT_TYPE):
     chat = update.effective_chat
     user = update.effective_user
     # Check permissions
-    member = await context.bot.get_chat_member(chat.id, user.id)
-    if not (settings.OWNER_USER_ID and user.id == settings.OWNER_USER_ID) and member.status not in ("administrator", "creator"):
+    # Allow: Owner, Controllers, Group Admins
+    is_authorized = False
+    if _is_admin(user.id):
+        is_authorized = True
+    else:
+        member = await context.bot.get_chat_member(chat.id, user.id)
+        if member.status in ("administrator", "creator"):
+            is_authorized = True
+            
+    if not is_authorized:
         return
         
     # /stop (or /pause) command in group: Disable translation only
