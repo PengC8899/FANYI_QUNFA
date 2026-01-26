@@ -1,7 +1,7 @@
 import uuid
-from typing import List
+from typing import List, Optional
 
-from fastapi import FastAPI, HTTPException, Request, Response, Form, Depends
+from fastapi import FastAPI, HTTPException, Request, Response, Form, Depends, UploadFile, File
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from telegram import Bot
@@ -169,23 +169,48 @@ async def delete_groups(payload: DeleteGroupsRequest):
 
 
 @app.post("/api/broadcast")
-async def broadcast(payload: BroadcastRequest):
-    if not payload.group_ids:
-        raise HTTPException(status_code=400, detail="group_ids is empty")
-    text = payload.text.strip()
-    if not text:
-        raise HTTPException(status_code=400, detail="text is empty")
+async def broadcast(
+    groupIds: List[int] = Form(...),
+    text: Optional[str] = Form(None),
+    image: Optional[UploadFile] = File(None)
+):
+    # Parse groupIds from form (might come as a list or comma-separated string depending on JS implementation, 
+    # but with FormData and standard fetch, if we append multiple 'groupIds', FastAPI sees a list)
+    # However, if we send JSON stringified list in a form field, we need to parse it.
+    # Let's assume frontend appends multiple fields with same name or we handle it.
+    # Actually, simpler is to accept a string and split it if needed, or rely on FastAPI List[int] form handling.
+    # But standard fetch FormData with array needs loop.
+    
+    if not groupIds:
+        raise HTTPException(status_code=400, detail="groupIds is empty")
+    
+    if not text and not image:
+        raise HTTPException(status_code=400, detail="text or image is required")
 
     success = 0
     failure = 0
-    for gid in payload.group_ids:
+    
+    # Read image content once if present
+    image_bytes = None
+    if image:
+        image_bytes = await image.read()
+
+    for gid in groupIds:
         try:
-            await bot.send_message(chat_id=gid, text=text)
+            if image_bytes:
+                # Send photo
+                # We need to pass bytes. Telegram Bot API expects file-like object.
+                # Since we iterate, we can't consume the same bytes object? 
+                # Actually we can pass bytes directly.
+                await bot.send_photo(chat_id=gid, photo=image_bytes, caption=text)
+            else:
+                # Text only
+                await bot.send_message(chat_id=gid, text=text)
             success += 1
         except Exception:
             failure += 1
 
-    return {"total": len(payload.group_ids), "success": success, "failure": failure}
+    return {"total": len(groupIds), "success": success, "failure": failure}
 
 
 @app.get("/api/tags", response_model=List[Tag])
@@ -327,6 +352,10 @@ async def dashboard_page():
                 <div class="mb-3">
                   <label for="broadcast-text" class="form-label fw-bold">广播内容</label>
                   <textarea class="form-control" id="broadcast-text" placeholder="在此输入要发送的文案..."></textarea>
+                </div>
+                <div class="mb-3">
+                  <label for="broadcast-image" class="form-label fw-bold">图片 (可选)</label>
+                  <input class="form-control" type="file" id="broadcast-image" accept="image/*">
                 </div>
                 <div class="d-grid gap-2">
                   <button class="btn btn-primary" onclick="broadcastToSelected()" id="btn-broadcast">
@@ -565,7 +594,9 @@ async def dashboard_page():
         async function broadcastToSelected() {
           const ids = getSelectedIds();
           const textInput = document.getElementById("broadcast-text");
+          const imageInput = document.getElementById("broadcast-image");
           const text = textInput.value;
+          const image = imageInput.files[0];
           const btn = document.getElementById("btn-broadcast");
           const resultDiv = document.getElementById("broadcast-result");
 
@@ -573,8 +604,8 @@ async def dashboard_page():
             showToast('提示', '请先在左侧勾选要广播的群组', 'info');
             return;
           }
-          if (!text.trim()) {
-            showToast('提示', '请输入要广播的文案', 'info');
+          if (!text.trim() && !image) {
+            showToast('提示', '请输入要广播的文案或选择一张图片', 'info');
             textInput.focus();
             return;
           }
@@ -584,10 +615,14 @@ async def dashboard_page():
           resultDiv.innerHTML = '';
 
           try {
+            const formData = new FormData();
+            ids.forEach(id => formData.append('groupIds', id));
+            if (text.trim()) formData.append('text', text);
+            if (image) formData.append('image', image);
+
             const res = await fetch("/api/broadcast", {
               method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ groupIds: ids, text })
+              body: formData
             });
             const data = await res.json();
             
@@ -599,6 +634,7 @@ async def dashboard_page():
             `;
             if (data.failure === 0) {
                 textInput.value = ''; 
+                imageInput.value = '';
             }
           } catch (err) {
             showToast('错误', '广播请求失败: ' + err, 'error');
