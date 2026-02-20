@@ -74,9 +74,12 @@ class HttpTranslator(Translator):
                         endpoint = "https://api-free.deepl.com/v2/translate"
                     async with httpx.AsyncClient(timeout=self.timeout) as client:
                         logger.info("deepl request endpoint=%s target=%s source=%s", endpoint, (target_lang or "EN").upper(), source_lang)
+                        # DeepL now requires header-based authentication
+                        headers = {
+                            "Authorization": f"DeepL-Auth-Key {self.api_key}"
+                        }
                         payload = {
-                            "auth_key": self.api_key,
-                            "text": text,
+                            "text": [text], # DeepL recommends list of strings
                             "target_lang": (target_lang or "EN").upper(),
                         }
                         if source_lang:
@@ -84,7 +87,8 @@ class HttpTranslator(Translator):
                             
                         r = await client.post(
                             endpoint,
-                            data=payload,
+                            headers=headers,
+                            json=payload, # Use JSON payload
                         )
                         r.raise_for_status()
                         data = r.json()
