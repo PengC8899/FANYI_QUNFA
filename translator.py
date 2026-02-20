@@ -90,7 +90,29 @@ class HttpTranslator(Translator):
                         data = r.json()
                         return data["translations"][0]["text"].strip()
                 elif self.provider == "google":
-                    raise RuntimeError("Google provider not implemented. Use openai/deepl or extend.")
+                    # Simple Google Translate (free endpoint)
+                    endpoint = "https://translate.googleapis.com/translate_a/single"
+                    # Google uses 'zh-CN' for Simplified Chinese
+                    tl = target_lang or "en"
+                    if tl.lower() in ("zh", "zh-cn", "zh-hans"):
+                        tl = "zh-CN"
+                    
+                    params = {
+                        "client": "gtx",
+                        "sl": source_lang or "auto",
+                        "tl": tl,
+                        "dt": "t",
+                        "q": text
+                    }
+                    async with httpx.AsyncClient(timeout=self.timeout) as client:
+                        r = await client.get(endpoint, params=params)
+                        r.raise_for_status()
+                        # Response is like [[["Hello","你好",null,null,1]],...]
+                        data = r.json()
+                        if data and isinstance(data, list) and len(data) > 0:
+                            # Combine all parts
+                            return "".join([part[0] for part in data[0] if part and len(part) > 0])
+                        return text
                 else:
                     raise RuntimeError("Unknown provider")
             except Exception as e:
