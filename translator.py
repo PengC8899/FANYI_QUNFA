@@ -6,7 +6,7 @@ import logging
 
 class Translator(abc.ABC):
     @abc.abstractmethod
-    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
+    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None, context: Optional[str] = None) -> str:
         raise NotImplementedError
 
 class HttpTranslator(Translator):
@@ -15,8 +15,9 @@ class HttpTranslator(Translator):
         self.api_key = api_key
         self.timeout = timeout
         self.max_retries = max_retries
+        self._client = httpx.AsyncClient(timeout=self.timeout)
 
-    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
+    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None, context: Optional[str] = None) -> str:
         attempt = 0
         last_exc = None
         logger = logging.getLogger("tg-bot")
@@ -51,6 +52,9 @@ class HttpTranslator(Translator):
                     else:
                         sys_prompt += " Detect language automatically. If Chinese -> English; If English -> Chinese."
 
+                    if context:
+                        sys_prompt += f"\n\nContext for this translation:\n{context}\n\nUse this context to resolve ambiguities, but only translate the user's text."
+
                     payload = {
                         "model": model,
                         "messages": [
@@ -62,37 +66,39 @@ class HttpTranslator(Translator):
                     from config import settings as _st
                     endpoint = _st.LLM_API_ENDPOINT or f"{base_url.rstrip('/')}/chat/completions"
                     
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        r = await client.post(endpoint, headers=headers, json=payload)
-                        r.raise_for_status()
-                        data = r.json()
-                        return data["choices"][0]["message"]["content"].strip()
+                    r = await self._client.post(endpoint, headers=headers, json=payload)
+                    r.raise_for_status()
+                    data = r.json()
+                    return data["choices"][0]["message"]["content"].strip()
                         
                 elif self.provider == "deepl":
                     endpoint = "https://api.deepl.com/v2/translate"
                     if self.api_key and self.api_key.endswith(":fx"):
                         endpoint = "https://api-free.deepl.com/v2/translate"
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        logger.info("deepl request endpoint=%s target=%s source=%s", endpoint, (target_lang or "EN").upper(), source_lang)
-                        # DeepL now requires header-based authentication
-                        headers = {
-                            "Authorization": f"DeepL-Auth-Key {self.api_key}"
-                        }
-                        payload = {
-                            "text": [text], # DeepL recommends list of strings
-                            "target_lang": (target_lang or "EN").upper(),
-                        }
-                        if source_lang:
-                            payload["source_lang"] = source_lang.upper()
-                            
-                        r = await client.post(
-                            endpoint,
-                            headers=headers,
-                            json=payload, # Use JSON payload
-                        )
-                        r.raise_for_status()
-                        data = r.json()
-                        return data["translations"][0]["text"].strip()
+                    
+                    logger.info("deepl request endpoint=%s target=%s source=%s", endpoint, (target_lang or "EN").upper(), source_lang)
+                    # DeepL now requires header-based authentication
+                    headers = {
+                        "Authorization": f"DeepL-Auth-Key {self.api_key}"
+                    }
+                    payload = {
+                        "text": [text], # DeepL recommends list of strings
+                        "target_lang": (target_lang or "EN").upper(),
+                    }
+                    if source_lang:
+                        payload["source_lang"] = source_lang.upper()
+                    if context:
+                        payload["context"] = context
+                        
+                    r = await self._client.post(
+                        endpoint,
+                        headers=headers,
+                        json=payload, # Use JSON payload
+                    )
+                    r.raise_for_status()
+                    data = r.json()
+                    translated_text = data["translations"][0]["text"].strip()
+                    return translated_text
                 elif self.provider == "google":
                     # Simple Google Translate (free endpoint)
                     endpoint = "https://translate.googleapis.com/translate_a/single"
@@ -108,15 +114,14 @@ class HttpTranslator(Translator):
                         "dt": "t",
                         "q": text
                     }
-                    async with httpx.AsyncClient(timeout=self.timeout) as client:
-                        r = await client.get(endpoint, params=params)
-                        r.raise_for_status()
-                        # Response is like [[["Hello","你好",null,null,1]],...]
-                        data = r.json()
-                        if data and isinstance(data, list) and len(data) > 0:
-                            # Combine all parts
-                            return "".join([part[0] for part in data[0] if part and len(part) > 0])
-                        return text
+                    r = await self._client.get(endpoint, params=params)
+                    r.raise_for_status()
+                    # Response is like [[["Hello","你好",null,null,1]],...]
+                    data = r.json()
+                    if data and isinstance(data, list) and len(data) > 0:
+                        # Combine all parts
+                        return "".join([part[0] for part in data[0] if part and len(part) > 0])
+                    return text
                 else:
                     raise RuntimeError("Unknown provider")
             except Exception as e:
