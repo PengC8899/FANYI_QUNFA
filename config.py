@@ -1,5 +1,5 @@
 from pydantic import Field
-from pydantic_settings import BaseSettings
+from pydantic_settings import BaseSettings, SettingsConfigDict
 from typing import Optional
 
 class Settings(BaseSettings):
@@ -26,8 +26,13 @@ class Settings(BaseSettings):
     DASHBOARD_USERNAME: str = Field(default="admin")
     DASHBOARD_PASSWORD: str = Field(default="9999")
 
-    class Config:
-        env_file = ".env"
-        env_file_encoding = "utf-8"
+    # Admin whitelist for group authorization check on bot join
+    REQUIRED_ADMIN_USERNAMES: str = Field(default="")
+
+    model_config = SettingsConfigDict(
+        env_file=".env",
+        env_file_encoding="utf-8",
+        extra="ignore",
+    )
 
 settings = Settings()
