@@ -23,7 +23,7 @@ class HttpTranslator(Translator):
         logger = logging.getLogger("tg-bot")
         while attempt < self.max_retries:
             try:
-                if self.provider == "openai":
+                if self.provider in ("openai", "qwen"):
                     # Use configurable base_url and model from settings (passed via init if needed, or global)
                     # For now, let's assume this HttpTranslator is instantiated with specific args or uses settings
                     # But better to use the instance variables if we pass them.

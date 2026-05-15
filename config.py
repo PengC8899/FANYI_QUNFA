@@ -4,7 +4,7 @@ from typing import Optional
 
 class Settings(BaseSettings):
     TELEGRAM_BOT_TOKEN: str
-    TRANSLATE_API: Optional[str] = Field(default=None)
+    TRANSLATE_API: Optional[str] = Field(default="qwen")
     TRANSLATE_API_KEY: Optional[str] = Field(default=None)
     OWNER_USER_ID: Optional[int] = Field(default=None)
     DB_PATH: str = Field(default="./data/bot.db")
@@ -18,9 +18,9 @@ class Settings(BaseSettings):
     
     # LLM Fallback Configuration
     LLM_API_KEY: Optional[str] = Field(default=None)
-    LLM_API_BASE: str = Field(default="https://api.openai.com/v1")
+    LLM_API_BASE: str = Field(default="https://dashscope-intl.aliyuncs.com/compatible-mode/v1")
     LLM_API_ENDPOINT: Optional[str] = Field(default=None)
-    LLM_MODEL: str = Field(default="gpt-4o-mini")
+    LLM_MODEL: str = Field(default="qwen-plus")
 
     # Dashboard Auth
     DASHBOARD_USERNAME: str = Field(default="admin")
