@@ -17,8 +17,10 @@
 
 ## 环境变量
 - `TELEGRAM_BOT_TOKEN`
-- `TRANSLATE_API`（google/deepl/openai）
-- `TRANSLATE_API_KEY`
+- `TRANSLATE_API`（固定为 qwen）
+- `LLM_API_KEY`（Qwen 的 API Key）
+- `LLM_API_BASE`（默认为 https://dashscope.aliyuncs.com/compatible-mode/v1）
+- `LLM_MODEL`（默认为 qwen-plus）
 - `OWNER_USER_ID`
 - `DB_PATH`（默认 `./data/bot.db`）
 - `ALLOW_BROADCAST_FROM_GROUPS`（默认 `false`）
@@ -39,8 +41,8 @@
 
 ## 翻译实现
 - 抽象接口：`Translator.translate(text, source_lang=None, target_lang=None) -> str`
-- HTTP 实现（示例）：`openai` 走 REST API；`google` / `deepl` 留扩展点。
-- 降级策略：当无 API Key 或调用失败，使用轻量级词典规则进行低精度翻译；不在群内公开“未配置”提示，错误通过日志与私聊告知 owner。
+- HTTP 实现：默认走 QWEN 兼容的 OpenAI REST API 接口（`/chat/completions`）。
+- 降级策略：无词典，仅依赖 LLM 引擎进行高质量翻译。
 - 语言检测：中文字符占比阈值判定；可选集成 `langdetect`。
 - 长度限制：译文超 4000 字符截断，并在私聊告知 owner。
 
@@ -93,8 +95,8 @@
   - 否则（只有数字/符号/表情）跳过（`commands.py:198-214`）。
   - 若群配置的语言模式不是 `auto`，则优先使用群级设置（`commands.py:221-233`）。
 - 实现与降级：
-  - 主翻译使用 `HttpTranslator` 或 `FallbackTranslator`（`commands.py:20-23,235-270`）。
-  - 主翻译失败、回声或结果不符合预期时，触发 LLM 兜底（如 OpenAI），仍失败则使用本地 Fallback 再试（`commands.py:238-253,272-287,318-336`）。
+  - 主翻译使用 `HttpTranslator` 并通过 QWEN API 调用（`commands.py`）。
+  - 若调用失败，则在日志中记录并跳过翻译。
 - 常见问题排查：
   - 群里完全不翻译：检查是否执行过 `/start`，在群内用 `/status` 看是否“已激活”；同时确认只在一台 VPS 上运行该 bot。
   - 只对部分消息翻译：确认消息不是命令/贴纸/图片/纯表情，且没有使用跳过前缀；检查群级语言模式是否锁死为固定 `en` 或 `zh`。

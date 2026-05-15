@@ -20,8 +20,6 @@ logger = logging.getLogger("tg-bot")
 async def _ensure_translator() -> Translator:
     if settings.TRANSLATE_API in ("qwen", "openai"):
         return HttpTranslator(settings.TRANSLATE_API, settings.LLM_API_KEY)
-    if settings.TRANSLATE_API and settings.TRANSLATE_API_KEY:
-        return HttpTranslator(settings.TRANSLATE_API, settings.TRANSLATE_API_KEY)
     return FallbackTranslator()
 
 async def cmd_start(update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -257,30 +255,8 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
 
     translator = await _ensure_translator()
     
-    # Define fallback function to call LLM if DeepL fails or returns bad result
-    async def try_fallback(reason: str):
-        if not settings.LLM_API_KEY:
-            logger.warning(f"Fallback triggered ({reason}) but LLM_API_KEY not set. Skipping.")
-            return None
-        
-        logger.info(f"Triggering LLM Fallback due to: {reason}")
-        try:
-            # Instantiate LLM translator
-            # Assuming HttpTranslator handles "openai" provider correctly now
-            llm_trans = HttpTranslator("openai", settings.LLM_API_KEY)
-            # Use same source/target logic
-            llm_result = await llm_trans.translate(text, source_lang=src, target_lang=target)
-            return sanitize_text(llm_result)
-        except Exception as ex:
-            logger.error(f"LLM Fallback failed: {ex}")
-            return None
-
     try:
-        # ... DeepL logic ...
-        # We don't really need accurate src lang for DeepL usually, but good to provide if known.
-        # But our logic for target is custom.
-        # Let's guess src based on target.
-        
+        # We don't really need accurate src lang usually, but good to provide if known.
         # Logic: 
         # If target is EN, source is likely ZH (since we detected ZH chars).
         # If target is ZH, source is likely Latin script (EN, ID, HI, etc). Better to Auto-Detect.
@@ -292,37 +268,19 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
         translated = await translator.translate(translate_text, source_lang=src, target_lang=target)
         translated = sanitize_text(translated)
         
-        should_use_fallback = False
-        fallback_reason = ""
-
         if not translated:
-            should_use_fallback = True
-            fallback_reason = "Empty result from DeepL"
-        elif translated.strip().lower() == translate_text.strip().lower():
-            should_use_fallback = True
-            fallback_reason = "DeepL returned identical text (echo)"
-        elif target == "zh":
+            logger.warning("Empty result from translator")
+            return
+            
+        if translated.strip().lower() == translate_text.strip().lower():
+            logger.info("Translator returned identical text (echo), skipping")
+            return
+
+        if target == "zh":
             res_zh_count = sum(1 for c in translated if '\u4e00' <= c <= '\u9fff')
             if res_zh_count == 0:
-                should_use_fallback = True
-                fallback_reason = "Target is ZH but result has no Chinese chars"
-
-        if should_use_fallback:
-            # Fallback always translate to ZH as per requirement
-            target = "zh"
-            llm_res = await try_fallback(fallback_reason)
-            if llm_res and llm_res.strip().lower() != text.strip().lower():
-                translated = llm_res
-            else:
-                # If LLM also failed or echoed, we give up to avoid spam
-                if not translated: return 
-                # If we have a DeepL result but it was rejected, and LLM failed, we might default to nothing
-                # or just return if it was echo.
-                if translated.strip().lower() == translate_text.strip().lower():
-                    return
-                # If target check failed for DeepL, and LLM failed, we skip
-                if sum(1 for c in translated if '\u4e00' <= c <= '\u9fff') == 0:
-                    return
+                logger.warning("Target is ZH but result has no Chinese chars, skipping")
+                return
 
         if translated:
             try:
@@ -340,15 +298,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.info("translated chat=%s msg=%s src=%s dst=%s", chat.id, msg.message_id, src, target)
     except Exception as e:
         logger.error("translate failed chat=%s msg=%s err=%s", chat.id, msg.message_id, e)
-        # Try fallback on exception too
-        try:
-            llm_res = await try_fallback(f"Exception: {e}")
-            if llm_res:
-                await msg.reply_text(llm_res)
-                return
-        except:
-            pass
-            
         storage.record_trans_log(chat.id, msg.message_id, user.id, src, target, False)
         return
 

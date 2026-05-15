@@ -24,11 +24,7 @@ class HttpTranslator(Translator):
         while attempt < self.max_retries:
             try:
                 if self.provider in ("openai", "qwen"):
-                    # Use configurable base_url and model from settings (passed via init if needed, or global)
-                    # For now, let's assume this HttpTranslator is instantiated with specific args or uses settings
-                    # But better to use the instance variables if we pass them.
-                    # To keep it simple for now, we'll use settings import inside method or passed in __init__
-                    # Let's import settings here to avoid circular dependency issues if any
+                    # Use configurable base_url and model from settings
                     from config import settings
                     
                     base_url = settings.LLM_API_BASE
@@ -40,7 +36,6 @@ class HttpTranslator(Translator):
 
                     headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
                     
-                    # Better system prompt for translation
                     sys_prompt = (
                         "You are a professional translation engine. "
                         "Translate the user's text to the target language directly. "
@@ -61,7 +56,7 @@ class HttpTranslator(Translator):
                             {"role": "system", "content": sys_prompt},
                             {"role": "user", "content": text},
                         ],
-                        "temperature": 0.3, # Slight flexibility for better fluency
+                        "temperature": 0.3,
                     }
                     from config import settings as _st
                     endpoint = _st.LLM_API_ENDPOINT or f"{base_url.rstrip('/')}/chat/completions"
@@ -70,60 +65,8 @@ class HttpTranslator(Translator):
                     r.raise_for_status()
                     data = r.json()
                     return data["choices"][0]["message"]["content"].strip()
-                        
-                elif self.provider == "deepl":
-                    endpoint = "https://api.deepl.com/v2/translate"
-                    if self.api_key and self.api_key.endswith(":fx"):
-                        endpoint = "https://api-free.deepl.com/v2/translate"
-                    
-                    logger.info("deepl request endpoint=%s target=%s source=%s", endpoint, (target_lang or "EN").upper(), source_lang)
-                    # DeepL now requires header-based authentication
-                    headers = {
-                        "Authorization": f"DeepL-Auth-Key {self.api_key}"
-                    }
-                    payload = {
-                        "text": [text], # DeepL recommends list of strings
-                        "target_lang": (target_lang or "EN").upper(),
-                    }
-                    if source_lang:
-                        payload["source_lang"] = source_lang.upper()
-                    if context:
-                        payload["context"] = context
-                        
-                    r = await self._client.post(
-                        endpoint,
-                        headers=headers,
-                        json=payload, # Use JSON payload
-                    )
-                    r.raise_for_status()
-                    data = r.json()
-                    translated_text = data["translations"][0]["text"].strip()
-                    return translated_text
-                elif self.provider == "google":
-                    # Simple Google Translate (free endpoint)
-                    endpoint = "https://translate.googleapis.com/translate_a/single"
-                    # Google uses 'zh-CN' for Simplified Chinese
-                    tl = target_lang or "en"
-                    if tl.lower() in ("zh", "zh-cn", "zh-hans"):
-                        tl = "zh-CN"
-                    
-                    params = {
-                        "client": "gtx",
-                        "sl": source_lang or "auto",
-                        "tl": tl,
-                        "dt": "t",
-                        "q": text
-                    }
-                    r = await self._client.get(endpoint, params=params)
-                    r.raise_for_status()
-                    # Response is like [[["Hello","你好",null,null,1]],...]
-                    data = r.json()
-                    if data and isinstance(data, list) and len(data) > 0:
-                        # Combine all parts
-                        return "".join([part[0] for part in data[0] if part and len(part) > 0])
-                    return text
                 else:
-                    raise RuntimeError("Unknown provider")
+                    raise RuntimeError("Unknown provider, please use qwen")
             except Exception as e:
                 logger.error("translator attempt=%s error=%s", attempt, e)
                 last_exc = e
@@ -135,43 +78,6 @@ class FallbackTranslator(Translator):
     def __init__(self):
         pass
 
-    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None) -> str:
-        zh_map = {
-            "你好": "hello",
-            "谢谢": "thank you",
-            "是": "is",
-            "我": "I",
-            "你": "you",
-            "他": "he",
-            "她": "she",
-            "我们": "we",
-            "好": "good",
-            "不": "not",
-            "请": "please",
-        }
-        en_map = {
-            "hello": "你好",
-            "thank": "谢谢",
-            "you": "你",
-            "is": "是",
-            "i": "我",
-            "he": "他",
-            "she": "她",
-            "we": "我们",
-            "good": "好",
-            "not": "不",
-            "please": "请",
-        }
-        if target_lang == "en":
-            out = text
-            for k, v in zh_map.items():
-                out = out.replace(k, v)
-            return out
-        if target_lang == "zh":
-            words = text.split()
-            res = []
-            for w in words:
-                lw = w.lower()
-                res.append(en_map.get(lw, w))
-            return "".join(res)
+    async def translate(self, text: str, source_lang: Optional[str] = None, target_lang: Optional[str] = None, context: Optional[str] = None) -> str:
+        # Fallback to returning original text if API fails completely
         return text
