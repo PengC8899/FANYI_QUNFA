@@ -1,4 +1,5 @@
 import uuid
+import logging
 from typing import List, Optional
 
 from fastapi import FastAPI, HTTPException, Request, Response, Form, Depends, UploadFile, File
@@ -9,6 +10,7 @@ from telegram import Bot
 from config import settings
 from storage import Storage
 
+logger = logging.getLogger(__name__)
 
 storage = Storage(settings.DB_PATH)
 bot = Bot(token=settings.TELEGRAM_BOT_TOKEN)
