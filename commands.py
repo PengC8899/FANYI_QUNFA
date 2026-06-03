@@ -276,12 +276,6 @@ async def handle_group_message(update: Update, context: ContextTypes.DEFAULT_TYP
             logger.info("Translator returned identical text (echo), skipping")
             return
 
-        if target == "zh":
-            res_zh_count = sum(1 for c in translated if '\u4e00' <= c <= '\u9fff')
-            if res_zh_count == 0:
-                logger.warning("Target is ZH but result has no Chinese chars, skipping")
-                return
-
         if translated:
             try:
                 if prefix:
