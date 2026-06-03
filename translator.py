@@ -16,13 +16,60 @@ IMPORTANT DOMAIN KNOWLEDGE & TERMINOLOGY:
    - USDT, F2F (Face-to-Face), Visa, Mastercard, IOB, UPI, MQR.
    - Enterprise, Company, Trade, Pvt Ltd, lakh (or lakhs).
 
-INDIAN BANK NAMES (DO NOT TRANSLATE, KEEP EXACTLY AS WRITTEN):
-- Public Sector Banks: State Bank of India (SBI), Punjab National Bank (PNB), Bank of Baroda (BOB), Canara Bank, Union Bank of India, Indian Bank, Bank of India (BOI), Central Bank of India, UCO Bank, Bank of Maharashtra, Punjab & Sind Bank, Indian Overseas Bank (IOB).
-- Major Private Banks: HDFC Bank, ICICI Bank, Axis Bank, Kotak Mahindra Bank, IndusInd Bank, IDFC FIRST Bank, YES BANK, RBL Bank, Federal Bank, DCB Bank, Bandhan Bank, South Indian Bank, Karnataka Bank, Karur Vysya Bank (KVB), Tamilnad Mercantile Bank (TMB), City Union Bank (CUB), CSB Bank, Dhanlaxmi Bank, Nainital Bank.
-- Small Finance Banks: AU Small Finance Bank, Ujjivan Small Finance Bank, Equitas Small Finance Bank, Jana Small Finance Bank, Utkarsh Small Finance Bank, ESAF Small Finance Bank, Suryoday Small Finance Bank, Unity Small Finance Bank, Capital Small Finance Bank, North East Small Finance Bank, Fincare Small Finance Bank, Shivalik Small Finance Bank.
-- Payments Banks: Airtel Payments Bank, India Post Payments Bank (IPPB), Fino Payments Bank, NSDL Payments Bank, Jio Payments Bank.
-- Foreign Banks: HSBC India, Standard Chartered Bank, Citibank India, Deutsche Bank India, DBS Bank India, Bank of America India, JPMorgan Chase India, Barclays Bank India, BNP Paribas India, Credit Agricole India.
-- Regional Rural Banks: Andhra Pradesh Grameena Vikas Bank, Andhra Pragathi Grameena Bank, Telangana Grameena Bank, Karnataka Gramin Bank, Kerala Gramin Bank, Maharashtra Gramin Bank, Punjab Gramin Bank, Uttar Bihar Gramin Bank, Baroda UP Bank, Uttarakhand Gramin Bank.
+INDIAN BANK NAMES, ABBREVIATIONS & IFSC PREFIXES:
+When you encounter these abbreviations or IFSC prefixes in the text, you MUST understand they refer to the corresponding Indian Bank. Keep them in English (do not translate to Chinese). If it's a known abbreviation, you can keep it as is or expand it to the full bank name in English, but NEVER translate the bank name to Chinese.
+
+[Public Sector Banks]
+SBI / SBIN -> State Bank of India
+PNB / PUNB -> Punjab National Bank
+BOB / BARB -> Bank of Baroda
+BOI / BKID -> Bank of India
+CANARA / CNRB -> Canara Bank
+UBI / UBIN -> Union Bank of India
+INDIAN -> Indian Bank
+CBI -> Central Bank of India
+UCO -> UCO Bank
+BOM -> Bank of Maharashtra
+PSB -> Punjab & Sind Bank
+IOB / IOBA -> Indian Overseas Bank
+
+[Major Private Banks]
+HDFC -> HDFC Bank
+ICICI / ICIC -> ICICI Bank
+AXIS / UTIB -> Axis Bank
+KOTAK / KKBK -> Kotak Mahindra Bank
+INDUS / INDB -> IndusInd Bank
+IDFC / IDFB -> IDFC FIRST Bank
+YES / YESB -> YES BANK
+RBL / RATN -> RBL Bank
+FED / FDRL -> Federal Bank
+DCB / DCBL -> DCB Bank
+CSB -> CSB Bank
+KARUR / KVB -> Karur Vysya Bank
+TMB -> Tamilnad Mercantile Bank
+CUB -> City Union Bank
+SIB -> South Indian Bank
+NBL -> Nainital Bank
+Bandhan Bank, Karnataka Bank, Dhanlaxmi Bank
+
+[Small Finance Banks (SFB)]
+AU / AUBL -> AU Small Finance Bank
+UJJIVAN -> Ujjivan Small Finance Bank
+EQUITAS -> Equitas Small Finance Bank
+JANA -> Jana Small Finance Bank
+UTKARSH / UTKS -> Utkarsh Small Finance Bank
+ESAF / ESFB -> ESAF Small Finance Bank
+SURYODAY -> Suryoday Small Finance Bank
+FINCARE -> Fincare Small Finance Bank
+SHIVALIK -> Shivalik Small Finance Bank
+Unity Small Finance Bank, Capital Small Finance Bank, North East Small Finance Bank
+
+[Payments Banks]
+Airtel Payments Bank, India Post Payments Bank (IPPB), Fino Payments Bank, NSDL Payments Bank, Jio Payments Bank.
+
+[Foreign & Rural Banks]
+HSBC India, Standard Chartered, Citibank India, Deutsche Bank, DBS Bank, Bank of America, JPMorgan Chase, Barclays, BNP Paribas.
+Andhra Pradesh Grameena Vikas Bank, Telangana Grameena Bank, Kerala Gramin Bank, etc.
 """
 
 class Translator(abc.ABC):
